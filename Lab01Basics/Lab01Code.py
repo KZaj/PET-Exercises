@@ -8,7 +8,7 @@
 # $ py.test-2.7 -v Lab01Tests.py 
 
 ###########################
-# Group Members: TODO
+# Group Members: Kamil Zajac
 ###########################
 
 
@@ -36,6 +36,9 @@ def encrypt_message(K, message):
     plaintext = message.encode("utf8")
     
     ## YOUR CODE HERE
+    aes = Cipher("aes-128-gcm")
+    iv = urandom(16)
+    ciphertext, tag = aes.quick_gcm_enc(K, iv, plaintext)
 
     return (iv, ciphertext, tag)
 
@@ -44,7 +47,13 @@ def decrypt_message(K, iv, ciphertext, tag):
 
         In case the decryption fails, throw an exception.
     """
+
     ## YOUR CODE HERE
+    aes = Cipher("aes-128-gcm")
+    try:
+ 	plain = aes.quick_gcm_dec(K, iv, ciphertext, tag)
+    except:
+	raise RuntimeError("decryption failed")
 
     return plain.encode("utf8")
 
@@ -59,7 +68,6 @@ def decrypt_message(K, iv, ciphertext, tag):
 # MUST NOT USE ANY OF THE petlib.ec FUNCIONS. Only petlib.bn!
 
 from petlib.bn import Bn
-
 
 def is_point_on_curve(a, b, p, x, y):
     """
@@ -78,8 +86,9 @@ def is_point_on_curve(a, b, p, x, y):
     assert (isinstance(x, Bn) and isinstance(y, Bn)) \
            or (x == None and y == None)
 
-    if x == None and y == None:
-        return True
+    # edited the code here, '==' is changed to 'is'
+    if x is None and y is None:
+       return True
 
     lhs = (y * y) % p
     rhs = (x*x*x + a*x + b) % p
@@ -101,7 +110,21 @@ def point_add(a, b, p, x0, y0, x1, y1):
     """
 
     # ADD YOUR CODE BELOW
-    xr, yr = None, None
+    # xr, yr = None, None
+
+    # q = 0, p = 1
+
+    # lam = (yq - yp) * (xq - xp)^-1 (mod p)
+    lam = (y0 - y1) * (x0 - x1).pow(-1) % p
+
+    # xr  = lam^2 - xp - xq (mod p)
+    xr  = lam.pow(2) - x1 - x0 % p
+
+    # yr  = lam * (xp - xr) - yp (mod p)
+    yr  = lam * (x1 - xr) - y1 % p 
+
+    if xr == yr:
+	raise Exception("issue!")
     
     return (xr, yr)
 
