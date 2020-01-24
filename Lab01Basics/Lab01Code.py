@@ -110,23 +110,41 @@ def point_add(a, b, p, x0, y0, x1, y1):
     """
 
     # ADD YOUR CODE BELOW
-    # xr, yr = None, None
 
-    # q = 0, p = 1
+    # handle cases where points are infinity
+    if (x0 is None and y0 is None) and (x1 is None and y1 is None):
+	return None, None
+    elif (x0 is None and y0 is None):
+        return x1, y1
+    elif (x1 is None and y1 is None):
+	return x0, y0
+
+    # handle cases where points are equal
+    if (x0 == x1) and (y0 == y1):
+        raise Exception("EC Points must not be equal")
 
     # lam = (yq - yp) * (xq - xp)^-1 (mod p)
-    lam = (y0 - y1) * (x0 - x1).pow(-1) % p
+    dy = y0 - y1
+    dx = x0 - x1
+    try: 
+        idx = dx.mod_inverse(p)
+    except:
+        return None, None
+  
+    # lam = (dy * idx).mod(p)
+    lam = dy * idx 
 
     # xr  = lam^2 - xp - xq (mod p)
-    xr  = lam.pow(2) - x1 - x0 % p
+    lamsq = lam.pow(2)
+    temp = lamsq - x0 - x1
+    xr = temp.mod(p)
 
     # yr  = lam * (xp - xr) - yp (mod p)
-    yr  = lam * (x1 - xr) - y1 % p 
-
-    if xr == yr:
-	raise Exception("issue!")
+    temp = x0 - xr
+    calc = lam * temp - y0
+    yr = calc.mod(p)
     
-    return (xr, yr)
+    return xr, yr
 
 def point_double(a, b, p, x, y):
     """Define "doubling" an EC point.
@@ -140,8 +158,17 @@ def point_double(a, b, p, x, y):
     Returns the point representing the double of the input (x, y).
     """  
 
+    if x is None or y is None:
+        return None, None
+
     # ADD YOUR CODE BELOW
-    xr, yr = None, None
+    fhalf = 3 * x.pow(2) + a
+    shalf = (2 * y).mod_inverse(p)
+
+    lam = fhalf * shalf
+
+    xr = (lam.pow(2) - 2 * x).mod(p)
+    yr = (lam * (x - xr) - y).mod(p)
 
     return xr, yr
 
@@ -163,7 +190,10 @@ def point_scalar_multiplication_double_and_add(a, b, p, x, y, scalar):
     P = (x, y)
 
     for i in range(scalar.num_bits()):
-        pass ## ADD YOUR CODE HERE
+        # CODE ADDED HERE
+        if scalar.is_bit_set(i):
+            Q = point_add(a, b, p, Q[0], Q[1], P[0], P[1])
+        P = point_double(a, b, p, P[0], P[1])
 
     return Q
 
@@ -189,7 +219,13 @@ def point_scalar_multiplication_montgomerry_ladder(a, b, p, x, y, scalar):
     R1 = (x, y)
 
     for i in reversed(range(0,scalar.num_bits())):
-        pass ## ADD YOUR CODE HERE
+        # CODE ADDED HERE
+        if not scalar.is_bit_set(i):
+            R1 = point_add(a, b, p, R0[0], R0[1], R1[0], R1[1])
+            R0 = point_double(a, b, p, R0[0], R0[1])
+        else:
+            R0 = point_add(a, b, p, R0[0], R0[1], R1[0], R1[1])
+            R1 = point_double(a, b, p, R1[0], R1[1])
 
     return R0
 
@@ -220,6 +256,8 @@ def ecdsa_sign(G, priv_sign, message):
     plaintext =  message.encode("utf8")
 
     ## YOUR CODE HERE
+    digest = sha256(plaintext).digest()
+    sig = do_ecdsa_sign(G, priv_sign, digest)
 
     return sig
 
@@ -228,6 +266,8 @@ def ecdsa_verify(G, pub_verify, message, sig):
     plaintext =  message.encode("utf8")
 
     ## YOUR CODE HERE
+    digest = sha256(plaintext).digest()
+    res = do_ecdsa_verify(G, pub_verify, sig, digest)
 
     return res
 
