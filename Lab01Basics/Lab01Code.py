@@ -38,6 +38,8 @@ def encrypt_message(K, message):
     ## YOUR CODE HERE
     aes = Cipher("aes-128-gcm")
     iv = urandom(16)
+
+    # Perform encryption 
     ciphertext, tag = aes.quick_gcm_enc(K, iv, plaintext)
 
     return (iv, ciphertext, tag)
@@ -50,6 +52,8 @@ def decrypt_message(K, iv, ciphertext, tag):
 
     ## YOUR CODE HERE
     aes = Cipher("aes-128-gcm")
+
+    # Perform decryption
     try:
  	plain = aes.quick_gcm_dec(K, iv, ciphertext, tag)
     except:
@@ -86,7 +90,7 @@ def is_point_on_curve(a, b, p, x, y):
     assert (isinstance(x, Bn) and isinstance(y, Bn)) \
            or (x == None and y == None)
 
-    # edited the code here, '==' is changed to 'is'
+    # Edited the code here, '==' is changed to 'is'
     if x is None and y is None:
        return True
 
@@ -111,16 +115,17 @@ def point_add(a, b, p, x0, y0, x1, y1):
 
     # ADD YOUR CODE BELOW
 
-    # handle cases where points are infinity
+    # Handle cases where points are infinity
     if (x0 is None and y0 is None):
         return x1, y1
     elif (x1 is None and y1 is None):
 	return x0, y0
 
-    # handle cases where points are equal
+    # Handle cases where points are equal
     if (x0 == x1) and (y0 == y1):
         raise Exception("EC Points must not be equal")
 
+    # Calculate the addition
     # lam = (yq - yp) * (xq - xp)^-1 (mod p)
     dy = y0 - y1
     dx = x0 - x1
@@ -160,6 +165,7 @@ def point_double(a, b, p, x, y):
         return None, None
 
     # ADD YOUR CODE BELOW
+    # Perform calculation using Bn functions
     fhalf = 3 * x.pow(2) + a
     shalf = (2 * y).mod_inverse(p)
 
@@ -189,6 +195,7 @@ def point_scalar_multiplication_double_and_add(a, b, p, x, y, scalar):
 
     for i in range(scalar.num_bits()):
         # CODE ADDED HERE
+        # Check bits and act accordingly 
         if scalar.is_bit_set(i):
             Q = point_add(a, b, p, Q[0], Q[1], P[0], P[1])
         P = point_double(a, b, p, P[0], P[1])
@@ -218,6 +225,7 @@ def point_scalar_multiplication_montgomerry_ladder(a, b, p, x, y, scalar):
 
     for i in reversed(range(0,scalar.num_bits())):
         # CODE ADDED HERE
+        # Check bits and act accordingly 
         if not scalar.is_bit_set(i):
             R1 = point_add(a, b, p, R0[0], R0[1], R1[0], R1[1])
             R0 = point_double(a, b, p, R0[0], R0[1])
@@ -255,6 +263,8 @@ def ecdsa_sign(G, priv_sign, message):
 
     ## YOUR CODE HERE
     digest = sha256(plaintext).digest()
+
+    # Sign the digest
     sig = do_ecdsa_sign(G, priv_sign, digest)
 
     return sig
@@ -265,6 +275,8 @@ def ecdsa_verify(G, pub_verify, message, sig):
 
     ## YOUR CODE HERE
     digest = sha256(plaintext).digest()
+
+    # Verify signature 
     res = do_ecdsa_verify(G, pub_verify, sig, digest)
 
     return res
@@ -279,13 +291,8 @@ def ecdsa_verify(G, pub_verify, message, sig):
 
 def dh_get_key():
     """ Generate a DH key pair """
-    # G is the agreed curve
     G = EcGroup()
-
-    # d_X is the private key for the user
     priv_dec = G.order().random()
-
-    # Q_X = d_X * G
     pub_enc = priv_dec * G.generator()
     return (G, priv_dec, pub_enc)
 
@@ -307,25 +314,23 @@ def dh_encrypt(pub, message, aliceSig = None):
     # we can calculate d_A Q_B = d_A d_B G
     # shared key is x coord of d_A d_B G
 
-    # generate a fresh public key (possibly signs)
+    # Generate a fresh public key
     G, priv, public = dh_get_key()
 
-    # t = pub.export()
-    # print(t, len(t))
-
-    # use private part of key to generate shared key
+    # Use private part of key to generate shared key
     # - scalar multiplication instead of exponentiation
     ''' Multiply the private part by Bob's public key '''
     secret = pub.pt_mul(priv)
     x, y = secret.get_affine()
     shared = x.binary()[:24]
 
+    # Perform encryption with shared key
     plaintext = message.encode("utf8")
     aes = Cipher("aes-192-gcm")
     iv = urandom(16)
     ciphertext, tag = aes.quick_gcm_enc(shared, iv, plaintext)
 
-    # send fresh public key, output of AEAD and possibly signatures
+    # Send fresh public key, output of AEAD and possibly signatures
     return (public, iv, ciphertext, tag)
 
 
@@ -335,23 +340,21 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
     the message came from Alice using her verification key."""
     
     ## YOUR CODE HERE
-    # G, priv, public = dh_get_key()
     pub = ciphertext[0]
     iv = ciphertext[1]
     tag = ciphertext[3]
 
-    # we want d_B Q_A = d_A d_B G
+    # We want d_B Q_A = d_A d_B G, to use as shared key
     secret = pub.pt_mul(priv)
     x, y = secret.get_affine()
     shared = x.binary()[:24]
 
+    # Perform decryption with shared key
     aes = Cipher("aes-192-gcm")
     try:
  	plain = aes.quick_gcm_dec(shared, iv, ciphertext[2], tag)
     except:
 	raise RuntimeError("decryption failed")
-
-    print(plain.encode("utf8"))
     return plain.encode("utf8")
 
 ## NOTE: populate those (or more) tests
@@ -362,8 +365,11 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
 def test_encrypt():
     msg = u"Hello World"
     G, priv, pub = dh_get_key()
+
+    # Perform encryption with given public key
     public, iv, ciphertext, tag = dh_encrypt(pub, msg)
 
+    # Validate outputs
     assert len(ciphertext) == len(msg)
     assert len(iv) == 16
     assert len(tag) == 16
@@ -371,33 +377,42 @@ def test_encrypt():
 def test_decrypt(): 
     msg = u"Hello World"
     G, priv, pub = dh_get_key()
+
+    # Perform encryption with given public key
     public, iv, ciphertext, tag = dh_encrypt(pub, msg)
 
+    # Validate outputs
     assert len(ciphertext) == len(msg)
     assert len(iv) == 16
     assert len(tag) == 16
 
+    # Perform decryption with given private key and encryption output
     m = dh_decrypt(priv, (public, iv, ciphertext, tag))
     assert m == msg
 
 def test_fails():
 
+    # For checking exception messages, as used in the test script
     from pytest import raises
     msg = u"Hello World"
     G, priv, pub = dh_get_key()
+
+    # Perform encryption with given public key
     public, iv, ciphertext, tag = dh_encrypt(pub, msg)
 
-    # using the wrong private key
+    # Using the wrong private key
     with raises(Exception) as excinfo:
         G_, priv_, pub_ = dh_get_key()
         dh_decrypt(priv_, (public, iv, ciphertext, tag))
     assert 'decryption failed' in str(excinfo.value)
 
-    # using the wrong public key
+    # Using the wrong public key
     with raises(Exception) as excinfo:
         dh_decrypt(priv, (pub, iv, ciphertext, tag))
     assert 'decryption failed' in str(excinfo.value)
 
+
+    # Using incorrect outputs of encryption
     with raises(Exception) as excinfo:
         dh_decrypt(priv, (public, urandom(len(iv)), ciphertext, tag))
     assert 'decryption failed' in str(excinfo.value)
