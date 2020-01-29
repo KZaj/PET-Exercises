@@ -8,7 +8,7 @@
 # $ py.test test_file_name.py
 
 ###########################
-# Group Members: TODO
+# Group Members: Kamil Zajac
 ###########################
 
 

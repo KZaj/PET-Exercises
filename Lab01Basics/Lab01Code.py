@@ -112,9 +112,7 @@ def point_add(a, b, p, x0, y0, x1, y1):
     # ADD YOUR CODE BELOW
 
     # handle cases where points are infinity
-    if (x0 is None and y0 is None) and (x1 is None and y1 is None):
-	return None, None
-    elif (x0 is None and y0 is None):
+    if (x0 is None and y0 is None):
         return x1, y1
     elif (x1 is None and y1 is None):
 	return x0, y0
@@ -281,8 +279,13 @@ def ecdsa_verify(G, pub_verify, message, sig):
 
 def dh_get_key():
     """ Generate a DH key pair """
+    # G is the agreed curve
     G = EcGroup()
+
+    # d_X is the private key for the user
     priv_dec = G.order().random()
+
+    # Q_X = d_X * G
     pub_enc = priv_dec * G.generator()
     return (G, priv_dec, pub_enc)
 
@@ -297,7 +300,34 @@ def dh_encrypt(pub, message, aliceSig = None):
     """
     
     ## YOUR CODE HERE
-    pass
+
+    # pub is Q_B = d_B G
+    # we generate Q_A = d_A G
+    # if we send Q_A, recipient calculates d_B Q_A = d_A d_B G
+    # we can calculate d_A Q_B = d_A d_B G
+    # shared key is x coord of d_A d_B G
+
+    # generate a fresh public key (possibly signs)
+    G, priv, public = dh_get_key()
+
+    # t = pub.export()
+    # print(t, len(t))
+
+    # use private part of key to generate shared key
+    # - scalar multiplication instead of exponentiation
+    ''' Multiply the private part by Bob's public key '''
+    secret = pub.pt_mul(priv)
+    x, y = secret.get_affine()
+    shared = x.binary()[:24]
+
+    plaintext = message.encode("utf8")
+    aes = Cipher("aes-192-gcm")
+    iv = urandom(16)
+    ciphertext, tag = aes.quick_gcm_enc(shared, iv, plaintext)
+
+    # send fresh public key, output of AEAD and possibly signatures
+    return (public, iv, ciphertext, tag)
+
 
 def dh_decrypt(priv, ciphertext, aliceVer = None):
     """ Decrypt a received message encrypted using your public key, 
@@ -305,7 +335,24 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
     the message came from Alice using her verification key."""
     
     ## YOUR CODE HERE
-    pass
+    # G, priv, public = dh_get_key()
+    pub = ciphertext[0]
+    iv = ciphertext[1]
+    tag = ciphertext[3]
+
+    # we want d_B Q_A = d_A d_B G
+    secret = pub.pt_mul(priv)
+    x, y = secret.get_affine()
+    shared = x.binary()[:24]
+
+    aes = Cipher("aes-192-gcm")
+    try:
+ 	plain = aes.quick_gcm_dec(shared, iv, ciphertext[2], tag)
+    except:
+	raise RuntimeError("decryption failed")
+
+    print(plain.encode("utf8"))
+    return plain.encode("utf8")
 
 ## NOTE: populate those (or more) tests
 #  ensure they run using the "py.test filename" command.
@@ -313,13 +360,56 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
 #  $ py.test-2.7 --cov-report html --cov Lab01Code Lab01Code.py 
 
 def test_encrypt():
-    assert False
+    msg = u"Hello World"
+    G, priv, pub = dh_get_key()
+    public, iv, ciphertext, tag = dh_encrypt(pub, msg)
 
-def test_decrypt():
-    assert False
+    assert len(ciphertext) == len(msg)
+    assert len(iv) == 16
+    assert len(tag) == 16
+
+def test_decrypt(): 
+    msg = u"Hello World"
+    G, priv, pub = dh_get_key()
+    public, iv, ciphertext, tag = dh_encrypt(pub, msg)
+
+    assert len(ciphertext) == len(msg)
+    assert len(iv) == 16
+    assert len(tag) == 16
+
+    m = dh_decrypt(priv, (public, iv, ciphertext, tag))
+    assert m == msg
 
 def test_fails():
-    assert False
+
+    from pytest import raises
+    msg = u"Hello World"
+    G, priv, pub = dh_get_key()
+    public, iv, ciphertext, tag = dh_encrypt(pub, msg)
+
+    # using the wrong private key
+    with raises(Exception) as excinfo:
+        G_, priv_, pub_ = dh_get_key()
+        dh_decrypt(priv_, (public, iv, ciphertext, tag))
+    assert 'decryption failed' in str(excinfo.value)
+
+    # using the wrong public key
+    with raises(Exception) as excinfo:
+        dh_decrypt(priv, (pub, iv, ciphertext, tag))
+    assert 'decryption failed' in str(excinfo.value)
+
+    with raises(Exception) as excinfo:
+        dh_decrypt(priv, (public, urandom(len(iv)), ciphertext, tag))
+    assert 'decryption failed' in str(excinfo.value)
+
+    with raises(Exception) as excinfo:
+        dh_decrypt(priv, (public, iv, urandom(len(ciphertext)), tag))
+    assert 'decryption failed' in str(excinfo.value)
+
+    with raises(Exception) as excinfo:
+        dh_decrypt(priv, (public, iv, ciphertext, urandom(len(tag))))
+    assert 'decryption failed' in str(excinfo.value)
+
 
 #####################################################
 # TASK 6 -- Time EC scalar multiplication
