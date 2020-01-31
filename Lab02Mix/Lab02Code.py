@@ -12,7 +12,7 @@
 #           be imported.
 
 ###########################
-# Group Members: TODO
+# Group Members: Kamil Zajac
 ###########################
 
 
@@ -68,6 +68,8 @@ def mix_server_one_hop(private_key, message_list):
 
     # Process all messages
     for msg in message_list:
+
+        print(len(msg.hmac), len(msg.address), len(msg.message))
 
         ## Check elements and lengths
         if not G.check_point(msg.ec_public_key) or \
@@ -133,6 +135,24 @@ def mix_client_one_hop(public_key, address, message):
     client_public_key  = private_key * G.generator()
 
     ## ADD CODE HERE
+    # compute shared key and split it for each operation
+    shared_element = private_key * public_key
+    key_material = sha512(shared_element.export()).digest()
+    hmac_key = key_material[:16]
+    address_key = key_material[16:32]
+    message_key = key_material[32:48]
+
+    ''' ciphers are AES-CTR of encoded address and message '''
+    iv = b"\x00"*16
+
+    address_cipher = aes_ctr_enc_dec(address_key, iv, address_plaintext)
+    message_cipher = aes_ctr_enc_dec(message_key, iv, message_plaintext)
+
+    ''' expected mac is mac of address cipher and message cipher ''' 
+    h = Hmac(b"sha512", hmac_key)       
+    h.update(address_cipher)
+    h.update(message_cipher)
+    expected_mac = h.digest()[:20]
 
     return OneHopMixMessage(client_public_key, expected_mac, address_cipher, message_cipher)
 

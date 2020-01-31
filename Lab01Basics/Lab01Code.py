@@ -321,12 +321,15 @@ def dh_encrypt(pub, message, aliceSig = None):
     # - scalar multiplication instead of exponentiation
     ''' Multiply the private part by Bob's public key '''
     secret = pub.pt_mul(priv)
-    x, y = secret.get_affine()
-    shared = x.binary()[:24]
+    # x, y = secret.get_affine()
+    # shared = x.binary()[:24]
+    shared = sha256(secret.export()).digest()
+    # print(len(shared))
 
     # Perform encryption with shared key
     plaintext = message.encode("utf8")
-    aes = Cipher("aes-192-gcm")
+    aes = Cipher("aes-256-gcm")
+    # print(aes.len_key())
     iv = urandom(16)
     ciphertext, tag = aes.quick_gcm_enc(shared, iv, plaintext)
 
@@ -346,11 +349,13 @@ def dh_decrypt(priv, ciphertext, aliceVer = None):
 
     # We want d_B Q_A = d_A d_B G, to use as shared key
     secret = pub.pt_mul(priv)
-    x, y = secret.get_affine()
-    shared = x.binary()[:24]
+    # x, y = secret.get_affine()
+    # shared = x.binary()[:24]
+    shared = sha256(secret.export()).digest()
 
     # Perform decryption with shared key
-    aes = Cipher("aes-192-gcm")
+    aes = Cipher("aes-256-gcm")
+    
     try:
  	plain = aes.quick_gcm_dec(shared, iv, ciphertext[2], tag)
     except:
