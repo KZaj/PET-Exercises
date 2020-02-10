@@ -69,8 +69,6 @@ def mix_server_one_hop(private_key, message_list):
     # Process all messages
     for msg in message_list:
 
-        print(len(msg.hmac), len(msg.address), len(msg.message))
-
         ## Check elements and lengths
         if not G.check_point(msg.ec_public_key) or \
                not len(msg.hmac) == 20 or \
@@ -142,16 +140,17 @@ def mix_client_one_hop(public_key, address, message):
     address_key = key_material[16:32]
     message_key = key_material[32:48]
 
-    ''' ciphers are AES-CTR of encoded address and message '''
+    ''' Ciphers are AES-CTR of encoded address and message '''
     iv = b"\x00"*16
-
     address_cipher = aes_ctr_enc_dec(address_key, iv, address_plaintext)
     message_cipher = aes_ctr_enc_dec(message_key, iv, message_plaintext)
 
-    ''' expected mac is mac of address cipher and message cipher ''' 
+    ''' Expected mac is mac of address cipher and message cipher ''' 
     h = Hmac(b"sha512", hmac_key)       
     h.update(address_cipher)
     h.update(message_cipher)
+
+    # First 20 bytes are the hash sum
     expected_mac = h.digest()[:20]
 
     return OneHopMixMessage(client_public_key, expected_mac, address_cipher, message_cipher)
@@ -202,6 +201,7 @@ def mix_server_n_hop(private_key, message_list, final=False):
         ## First get a shared key
         shared_element = private_key * msg.ec_public_key
         key_material = sha512(shared_element.export()).digest()
+        print(shared_element)
 
         # Use different parts of the shared key for different operations
         hmac_key = key_material[:16]
@@ -214,15 +214,23 @@ def mix_server_n_hop(private_key, message_list, final=False):
 
         ## Check the HMAC
         h = Hmac(b"sha512", hmac_key)
+        # print("-", hmac_key)
+	# print("()", hmac_key)
 
         for other_mac in msg.hmacs[1:]:
+	    # print("|", other_mac)
             h.update(other_mac)
 
         h.update(msg.address)
+    
+        # print(msg.address)
         h.update(msg.message)
-
+        # print(msg.message)
         expected_mac = h.digest()
+	# print("@", msg.hmacs[0])
 
+        # print("-", hmac_key)
+        # print(msg.hmacs[0], expected_mac[:20])
         if not secure_compare(msg.hmacs[0], expected_mac[:20]):
             raise Exception("HMAC check failure")
 
@@ -237,6 +245,8 @@ def mix_server_n_hop(private_key, message_list, final=False):
 
             hmac_plaintext = aes_ctr_enc_dec(hmac_key, iv, other_mac)
             new_hmacs += [hmac_plaintext]
+
+	    # print(other_mac, i, hmac_plaintext)
 
         # Decrypt address & message
         iv = b"\x00"*16
@@ -268,7 +278,9 @@ def mix_client_n_hop(public_keys, address, message):
 
     """
     G = EcGroup()
-    # assert G.check_point(public_key)
+    # This assertion was originally commented out
+    for public_key in public_keys:
+    	assert G.check_point(public_key)
     assert isinstance(address, bytes) and len(address) <= 256
     assert isinstance(message, bytes) and len(message) <= 1000
 
@@ -282,6 +294,94 @@ def mix_client_n_hop(public_keys, address, message):
     client_public_key  = private_key * G.generator()
 
     ## ADD CODE HERE
+
+    # Encrypt the address and the message
+    shared_element = private_key * public_keys[0]
+    key_material = sha512(shared_element.export()).digest()
+    hmac_key = key_material[:16]
+    address_key = key_material[16:32]
+    message_key = key_material[32:48]
+    iv = b"\x00"*16
+    address_cipher = aes_ctr_enc_dec(address_key, iv, address_plaintext)
+    message_cipher = aes_ctr_enc_dec(message_key, iv, message_plaintext)
+
+    # Calculate shared keys, taking into account blinding
+    shared_elems = []
+    blinded = []
+
+    new = public_keys[0]
+    for i, public_key in enumerate(public_keys):
+	
+	shared = private_key * new
+	shared_elems.append(shared)
+
+	if i == len(public_keys) - 1:
+		break
+
+	key_material = sha512(shared.export()).digest()
+    	blinding = Bn.from_binary(key_material[48:])
+    	blinded.append(blinding)
+
+	blind = blinded[0]
+	for b in range(len(blinded[1:])):
+		blind = blind * blinded[b + 1]
+
+	new = blind * public_keys[i + 1]
+
+    # Keys are used in reverse order
+    shared_elems.reverse()
+    public_keys.reverse()
+
+    hmacs = []
+    for i, public_key in enumerate(public_keys):
+
+	shared_element = shared_elems[i]
+
+	if i < len(public_keys) - 1:
+		
+		key_material = sha512(shared_element.export()).digest()
+
+		print(shared_element)
+    		hmac_key = key_material[:16]
+
+		shared_element = private_key * public_keys[i + 1]
+    		key_material = sha512(shared_element.export()).digest()
+            		
+		h = Hmac(b"sha512", hmac_key)
+		# print("()", hmac_key)
+		for j, hm in enumerate(hmacs):
+			iv = pack("H14s", j + 1, b"\x00"*14)
+			hmac_plaintext = aes_ctr_enc_dec(key_material[:16], iv, hm)
+			# print("|", hmac_plaintext)
+        		h.update(hmac_plaintext)    
+     
+	    	h.update(address_plaintext)
+	    	h.update(message_plaintext)
+
+		expected_mac = h.digest()[:20]
+		iv = pack("H14s", 0, b"\x00"*14)
+		expected_mac = aes_ctr_enc_dec(key_material[:16], iv, expected_mac)
+		hmacs.insert(0, expected_mac)
+			
+	else:
+		# shared_element = private_key * public_key
+    		print(shared_element)
+	    	key_material = sha512(shared_element.export()).digest()
+	    	hmac_key = key_material[:16]
+
+		h = Hmac(b"sha512", hmac_key)
+		# print("()", hmac_key)
+		for hm in hmacs:
+			# print("|", hm, "lol")
+			h.update(hm)       
+	    	h.update(address_cipher)
+		# print("|", address_cipher)
+	    	h.update(message_cipher)
+
+		expected_mac = h.digest()[:20]
+		hmacs.insert(0, expected_mac)
+
+    print("\n^^^ Encoded ^^^\n")
 
     return NHopMixMessage(client_public_key, hmacs, address_cipher, message_cipher)
 
