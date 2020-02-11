@@ -71,10 +71,10 @@ def mix_server_one_hop(private_key, message_list):
 
         ## Check elements and lengths
         if not G.check_point(msg.ec_public_key) or \
-               not len(msg.hmac) == 20 or \
-               not len(msg.address) == 258 or \
-               not len(msg.message) == 1002:
-           raise Exception("Malformed input message")
+        		not len(msg.hmac) == 20 or \
+        		not len(msg.address) == 258 or \
+        		not len(msg.message) == 1002:
+        	raise Exception("Malformed input message")
 
         ## First get a shared key
         shared_element = private_key * msg.ec_public_key
@@ -92,7 +92,7 @@ def mix_server_one_hop(private_key, message_list):
         expected_mac = h.digest()
 
         if not secure_compare(msg.hmac, expected_mac[:20]):
-            raise Exception("HMAC check failure")
+        	raise Exception("HMAC check failure")
 
         ## Decrypt the address and the message
         iv = b"\x00"*16
@@ -192,11 +192,11 @@ def mix_server_n_hop(private_key, message_list, final=False):
 
         ## Check elements and lengths
         if not G.check_point(msg.ec_public_key) or \
-               not isinstance(msg.hmacs, list) or \
-               not len(msg.hmacs[0]) == 20 or \
-               not len(msg.address) == 258 or \
-               not len(msg.message) == 1002:
-           raise Exception("Malformed input message")
+        		not isinstance(msg.hmacs, list) or \
+        		not len(msg.hmacs[0]) == 20 or \
+        		not len(msg.address) == 258 or \
+        		not len(msg.message) == 1002:
+        	raise Exception("Malformed input message")
 
         ## First get a shared key
         shared_element = private_key * msg.ec_public_key
@@ -221,7 +221,7 @@ def mix_server_n_hop(private_key, message_list, final=False):
         expected_mac = h.digest()
 
         if not secure_compare(msg.hmacs[0], expected_mac[:20]):
-            raise Exception("HMAC check failure")
+        	raise Exception("HMAC check failure")
 
         ## Decrypt the hmacs, address and the message
         aes = Cipher("AES-128-CTR") 
@@ -229,10 +229,10 @@ def mix_server_n_hop(private_key, message_list, final=False):
         # Decrypt hmacs
         new_hmacs = []
         for i, other_mac in enumerate(msg.hmacs[1:]):
-            # Ensure the IV is different for each hmac
-            iv = pack("H14s", i, b"\x00"*14)
-            hmac_plaintext = aes_ctr_enc_dec(hmac_key, iv, other_mac)
-            new_hmacs += [hmac_plaintext]
+        	# Ensure the IV is different for each hmac
+        	iv = pack("H14s", i, b"\x00"*14)
+        	hmac_plaintext = aes_ctr_enc_dec(hmac_key, iv, other_mac)
+        	new_hmacs += [hmac_plaintext]
 
         # Decrypt address & message
         iv = b"\x00"*16
@@ -241,16 +241,16 @@ def mix_server_n_hop(private_key, message_list, final=False):
         message_plaintext = aes_ctr_enc_dec(message_key, iv, msg.message)
 
         if final:
-            # Decode the address and message
-            address_len, address_full = unpack("!H256s", address_plaintext)
-            message_len, message_full = unpack("!H1000s", message_plaintext)
+        	# Decode the address and message
+        	address_len, address_full = unpack("!H256s", address_plaintext)
+        	message_len, message_full = unpack("!H1000s", message_plaintext)
 
-            out_msg = (address_full[:address_len], message_full[:message_len])
-            out_queue += [out_msg]
+        	out_msg = (address_full[:address_len], message_full[:message_len])
+        	out_queue += [out_msg]
         else:
-            # Pass the new mix message to the next mix
-            out_msg = NHopMixMessage(new_ec_public_key, new_hmacs, address_plaintext, message_plaintext)
-            out_queue += [out_msg]
+        	# Pass the new mix message to the next mix
+        	out_msg = NHopMixMessage(new_ec_public_key, new_hmacs, address_plaintext, message_plaintext)
+        	out_queue += [out_msg]
 
     return out_queue
 
@@ -314,34 +314,34 @@ def mix_client_n_hop(public_keys, address, message):
     for i, public_key in enumerate(public_keys):
     	shared_element = shared_elems[i]
 
-		# Get the appropriate key from each part of the shared key
+	# Get the appropriate key from each part of the shared key
     	key_material = sha512(shared_element.export()).digest()
     	hmac_key = key_material[:16]
     	address_key = key_material[16:32]
     	message_key = key_material[32:48]
 
-		# Encrypt the message and address at each stage
+	# Encrypt the message and address at each stage
     	iv = b"\x00"*16
     	address_cipher = aes_ctr_enc_dec(address_key, iv, address_cipher)
     	message_cipher = aes_ctr_enc_dec(message_key, iv, message_cipher)
 
-		# Encrypt the hmacs at each stage
-		for j, hm in enumerate(hmacs):
-			iv = pack("H14s", j, b"\x00"*14)
-			hmac_plaintext = aes_ctr_enc_dec(key_material[:16], iv, hm)
-			hmacs[j] = hmac_plaintext
+	# Encrypt the hmacs at each stage
+	for j, hm in enumerate(hmacs):
+		iv = pack("H14s", j, b"\x00"*14)
+		hmac_plaintext = aes_ctr_enc_dec(key_material[:16], iv, hm)
+		hmacs[j] = hmac_plaintext
 		
-		# Generate the expected mac for each stage
-	   	h = Hmac(b"sha512", hmac_key) 
-		for hm in hmacs:
-			h.update(hm)
-	    	h.update(address_cipher)
-	    	h.update(message_cipher)
-	    	expected_mac = h.digest()[:20]
+	# Generate the expected mac for each stage
+	h = Hmac(b"sha512", hmac_key) 
+	for hm in hmacs:
+		h.update(hm)
+	h.update(address_cipher)
+	h.update(message_cipher)
+	expected_mac = h.digest()[:20]
 
-		# Each hmac is inserted at the start of the list, as the last hmac is the first to be
-		# inspected - the last encryption is also the first to be decrypted
-		hmacs.insert(0, expected_mac)
+	# Each hmac is inserted at the start of the list, as the last hmac is the first to be
+	# inspected - the last encryption is also the first to be decrypted
+	hmacs.insert(0, expected_mac)
 
     return NHopMixMessage(client_public_key, hmacs, address_cipher, message_cipher)
 
