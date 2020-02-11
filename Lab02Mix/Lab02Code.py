@@ -293,8 +293,8 @@ def mix_client_n_hop(public_keys, address, message):
 			break
 
 		key_material = sha512(shared.export()).digest()
-	    	blinding = Bn.from_binary(key_material[48:])
-	    	blinded.append(blinding)
+		blinding = Bn.from_binary(key_material[48:])
+		blinded.append(blinding)
 
 		blind = blinded[0]
 		for b in range(len(blinded[1:])):
