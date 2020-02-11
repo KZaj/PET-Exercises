@@ -214,7 +214,7 @@ def mix_server_n_hop(private_key, message_list, final=False):
         ## Check the HMAC
         h = Hmac(b"sha512", hmac_key)
         for other_mac in msg.hmacs[1:]:
-            h.update(other_mac)
+        	h.update(other_mac)
 
         h.update(msg.address)
         h.update(msg.message)
@@ -264,7 +264,7 @@ def mix_client_n_hop(public_keys, address, message):
 
     """
     G = EcGroup()
-    # This assertion was originally commented out
+    # This assertion was originally commented out, can instead check each of the keys one by one
     for public_key in public_keys:
     	assert G.check_point(public_key)
     assert isinstance(address, bytes) and len(address) <= 256
@@ -287,19 +287,19 @@ def mix_client_n_hop(public_keys, address, message):
     new = public_keys[0]
     for i, public_key in enumerate(public_keys):
 	
-	shared = private_key * new
-	shared_elems.append(shared)
-	if i == len(public_keys) - 1:
-		break
+		shared = private_key * new
+		shared_elems.append(shared)
+		if i == len(public_keys) - 1:
+			break
 
-	key_material = sha512(shared.export()).digest()
-    	blinding = Bn.from_binary(key_material[48:])
-    	blinded.append(blinding)
+		key_material = sha512(shared.export()).digest()
+	    	blinding = Bn.from_binary(key_material[48:])
+	    	blinded.append(blinding)
 
-	blind = blinded[0]
-	for b in range(len(blinded[1:])):
-		blind = blind * blinded[b + 1]
-	new = blind * public_keys[i + 1]
+		blind = blinded[0]
+		for b in range(len(blinded[1:])):
+			blind = blind * blinded[b + 1]
+		new = blind * public_keys[i + 1]
 
     # Shared keys are used 'backwards'
     shared_elems.reverse()
@@ -314,34 +314,34 @@ def mix_client_n_hop(public_keys, address, message):
     for i, public_key in enumerate(public_keys):
     	shared_element = shared_elems[i]
 
-	# Get the appropriate key from each part of the shared key
+		# Get the appropriate key from each part of the shared key
     	key_material = sha512(shared_element.export()).digest()
     	hmac_key = key_material[:16]
     	address_key = key_material[16:32]
     	message_key = key_material[32:48]
 
-	# Encrypt the message and address at each stage
+		# Encrypt the message and address at each stage
     	iv = b"\x00"*16
     	address_cipher = aes_ctr_enc_dec(address_key, iv, address_cipher)
     	message_cipher = aes_ctr_enc_dec(message_key, iv, message_cipher)
 
-	# Encrypt the hmacs at each stage
-	for j, hm in enumerate(hmacs):
-		iv = pack("H14s", j, b"\x00"*14)
-		hmac_plaintext = aes_ctr_enc_dec(key_material[:16], iv, hm)
-		hmacs[j] = hmac_plaintext
+		# Encrypt the hmacs at each stage
+		for j, hm in enumerate(hmacs):
+			iv = pack("H14s", j, b"\x00"*14)
+			hmac_plaintext = aes_ctr_enc_dec(key_material[:16], iv, hm)
+			hmacs[j] = hmac_plaintext
 		
-	# Generate the expected mac for each stage
-   	h = Hmac(b"sha512", hmac_key) 
-	for hm in hmacs:
-		h.update(hm)
-    	h.update(address_cipher)
-    	h.update(message_cipher)
-    	expected_mac = h.digest()[:20]
+		# Generate the expected mac for each stage
+	   	h = Hmac(b"sha512", hmac_key) 
+		for hm in hmacs:
+			h.update(hm)
+	    	h.update(address_cipher)
+	    	h.update(message_cipher)
+	    	expected_mac = h.digest()[:20]
 
-	# Each hmac is inserted at the start of the list, as the last hmac is the first to be
-	# inspected - the last encryption is also the first to be decrypted
-	hmacs.insert(0, expected_mac)
+		# Each hmac is inserted at the start of the list, as the last hmac is the first to be
+		# inspected - the last encryption is also the first to be decrypted
+		hmacs.insert(0, expected_mac)
 
     return NHopMixMessage(client_public_key, hmacs, address_cipher, message_cipher)
 
@@ -411,7 +411,7 @@ def analyze_trace(trace, target_number_of_friends, target=0):
     # Restructure the counting dictionary as a list of tuples for sorting
     tups = []
     for rec in counts:
-	tups.append((rec, counts[rec]))
+		tups.append((rec, counts[rec]))
 
     # Sort the list of identifier appearances by the number of their appearances
     s_tups = sorted(tups, key=lambda x: x[1])
@@ -419,7 +419,7 @@ def analyze_trace(trace, target_number_of_friends, target=0):
     # Extract the top 'number of friends' identifiers
     identifiers = []
     for i in range(1, target_number_of_friends + 1):
-	identifiers.append(s_tups[-i][0])
+		identifiers.append(s_tups[-i][0])
 
     return identifiers
 
