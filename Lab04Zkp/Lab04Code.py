@@ -7,7 +7,7 @@
 # $ py.test -v test_file_name.py
 
 ###########################
-# Group Members: TODO
+# Group Members: Kamil Zajac
 ###########################
 
 from petlib.ec import EcGroup
@@ -52,6 +52,10 @@ def proveKey(params, priv, pub):
     (G, g, hs, o) = params
     
     ## YOUR CODE HERE:
+    x = priv 
+    w, W = keyGen(params)
+    c = to_challenge([g, W])
+    r = (w - c * x) % o
     
     return (c, r)
 
@@ -92,6 +96,29 @@ def proveCommitment(params, C, r, secrets):
     x0, x1, x2, x3 = secrets
 
     ## YOUR CODE HERE:
+    # g ^ v = r * g
+    # h ^ o = SUM xi * hi
+
+    # random w1, wi : W = h ^ wi * g ^ w1
+    hs = [h0, h1, h2, h3, g]
+    ws = []
+    os = [x0, x1, x2, x3, r]
+
+    w = o.random()
+    ws.append(w)
+    W = w * hs[0]
+    for h in hs[1:]:
+        w = o.random()
+        ws.append(w)
+        W += w * h
+
+    # c = H(g, h, C(?), W)
+    c = to_challenge([g, h0, h1, h2, h3, W])
+
+    responses = []
+    for i in range(len(ws)):
+        response = ws[i] - c * os[i]
+        responses.append(response)
 
     return (c, responses)
 
@@ -139,8 +166,11 @@ def verifyDLEquality(params, K, L, proof):
     c, r = proof
 
     ## YOUR CODE HERE:
+    k = c * K + r * g 
+    l = c * L + r * h0
 
-    return # YOUR RETURN HERE
+    # return # YOUR RETURN HERE
+    return to_challenge([g, h0, k, l]) == c
 
 #####################################################
 # TASK 4 -- Prove correct encryption and knowledge of 
@@ -164,6 +194,13 @@ def proveEnc(params, pub, Ciphertext, k, m):
     a, b = Ciphertext
 
     ## YOUR CODE HERE:
+
+    # Proof that we know the value of k 
+    # w, W = keyGen(params)
+    # c = to_challenge([g, W])
+    # rk = (w - c * k) % o
+
+    # What are we supposed to prove? That a, b = ciphertext? That we know k?
 
     return (c, (rk, rm))
 
