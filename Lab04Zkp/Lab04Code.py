@@ -246,16 +246,16 @@ def prove_x0eq10x1plus20(params, C, x0, x1, r):
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
-    _r = o.random()          # random no. for r
-    _x1 = o.random()         # random no. for x1
-    _x0 = (10 * _x1 + 20)    # corresponding x0 for generated x1
+    w1 = o.random()
+    w2 = o.random()
 
-    W = _r * g + _x1 * h1 + _x0 * h0
+    W = (10 * w1 + 15) * h0 + w1 * h1 + w2 * g
+
     c = to_challenge([g, h0, h1, C, W])
 
-    r0 = _x0 - c * x0
-    r1 = _x1 - c * x1
-    rr = _r - c * r
+    r0 = (10 * w1 + 15) - c * x0
+    r1 = w1 - c * x1
+    rr = w2 - c * r
 
     return (c, r0, r1, rr)
 
