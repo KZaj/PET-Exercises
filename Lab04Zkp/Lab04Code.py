@@ -52,10 +52,9 @@ def proveKey(params, priv, pub):
     (G, g, hs, o) = params
     
     ## YOUR CODE HERE:
-    x = priv 
     w, W = keyGen(params)
     c = to_challenge([g, W])
-    r = (w - c * x) % o
+    r = (w - c * priv) % o
     
     return (c, r)
 
@@ -117,7 +116,7 @@ def proveCommitment(params, C, r, secrets):
 
     responses = []
     for i in range(len(ws)):
-        response = ws[i] - c * os[i]
+        response = (ws[i] - c * os[i]) % o
         responses.append(response)
 
     return (c, responses)
@@ -200,16 +199,14 @@ def proveEnc(params, pub, Ciphertext, k, m):
     
     # Prove that we know k and m
     # C = k * g + k * pub + m * h0
-    C = a + b
-
     _k = o.random()
     _m = o.random()
 
     W = _k * g + _k * pub + _m * h0
-    c = to_challenge([g, pub, h0, C, W])
+    c = to_challenge([g, pub, h0, W])
 
-    rk = _k - c * k
-    rm = _m - c * m 
+    rk = (_k - c * k) % o
+    rm = (_m - c * m) % o
 
     return (c, (rk, rm))
 
@@ -220,10 +217,9 @@ def verifyEnc(params, pub, Ciphertext, proof):
     (c, (rk, rm)) = proof
 
     ## YOUR CODE HERE:
-    C = a + b
-    W_prime = rk * g + rk * pub + rm * h0 + c * C 
+    W_prime = rk * g + rk * pub + rm * h0 + c * (a + b)
 
-    return to_challenge([g, pub, h0, C, W_prime]) == c  ## YOUR RETURN HERE
+    return to_challenge([g, pub, h0, W_prime]) == c  ## YOUR RETURN HERE
 
 #####################################################
 # TASK 5 -- Prove a linear relation
@@ -245,27 +241,25 @@ def prove_x0eq10x1plus20(params, C, x0, x1, r):
     """ Prove C is a commitment to x0 and x1 and that x0 = 10 x1 + 20. """
     (G, g, (h0, h1, h2, h3), o) = params
 
-    ## YOUR CODE HERE:
-    w1 = o.random()
-    w2 = o.random()
+    ## YOUR CODE HERE:   
+    _r = o.random()
+    _x1 = o.random()
 
-    W = (10 * w1 + 15) * h0 + w1 * h1 + w2 * g
-
+    W = _r * g + _x1 * h1 + (10 * _x1 * h0)
     c = to_challenge([g, h0, h1, C, W])
 
-    r0 = (10 * w1 + 15) - c * x0
-    r1 = w1 - c * x1
-    rr = w2 - c * r
+    rr = (_r - c * r) % o
+    r1 = (_x1 - c * x1) % o
 
-    return (c, r0, r1, rr)
+    return (c, rr, r1)
 
 def verify_x0eq10x1plus20(params, C, proof):
     """ Verify that proof of knowledge of C and x0 = 10 x1 + 20. """
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
-    (c, r0, r1, rr) = proof
-    W_prime = rr * g + r0 * h0 + r1 * h1 + c * C
+    (c, rr, r1) = proof
+    W_prime = rr * g + r1 * h1 + (r1 * 10 * h0) + c * (-20 * h0 + C)
 
     return to_challenge([g, h0, h1, C, W_prime]) == c ## YOUR RETURN HERE
 
