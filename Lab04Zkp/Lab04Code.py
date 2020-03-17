@@ -195,12 +195,21 @@ def proveEnc(params, pub, Ciphertext, k, m):
 
     ## YOUR CODE HERE:
 
-    # Proof that we know the value of k 
-    # w, W = keyGen(params)
-    # c = to_challenge([g, W])
-    # rk = (w - c * k) % o
+    # We want to prove that we know k
+    # We want to prove that a = k * g and that b = k * pub + m * h0
+    
+    # Prove that we know k and m
+    # C = k * g + k * pub + m * h0
+    C = a + b
 
-    # What are we supposed to prove? That a, b = ciphertext? That we know k?
+    _k = o.random()
+    _m = o.random()
+
+    W = _k * g + _k * pub + _m * h0
+    c = to_challenge([g, pub, h0, C, W])
+
+    rk = _k - c * k
+    rm = _m - c * m 
 
     return (c, (rk, rm))
 
@@ -211,9 +220,10 @@ def verifyEnc(params, pub, Ciphertext, proof):
     (c, (rk, rm)) = proof
 
     ## YOUR CODE HERE:
+    C = a + b
+    W_prime = rk * g + rk * pub + rm * h0 + c * C 
 
-    return ## YOUR RETURN HERE
-
+    return to_challenge([g, pub, h0, C, W_prime]) == c  ## YOUR RETURN HERE
 
 #####################################################
 # TASK 5 -- Prove a linear relation
@@ -236,16 +246,28 @@ def prove_x0eq10x1plus20(params, C, x0, x1, r):
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
+    _r = o.random()          # random no. for r
+    _x1 = o.random()         # random no. for x1
+    _x0 = (10 * _x1 + 20)    # corresponding x0 for generated x1
 
-    return ## YOUR RETURN HERE
+    W = _r * g + _x1 * h1 + _x0 * h0
+    c = to_challenge([g, h0, h1, C, W])
+
+    r0 = _x0 - c * x0
+    r1 = _x1 - c * x1
+    rr = _r - c * r
+
+    return (c, r0, r1, rr)
 
 def verify_x0eq10x1plus20(params, C, proof):
     """ Verify that proof of knowledge of C and x0 = 10 x1 + 20. """
     (G, g, (h0, h1, h2, h3), o) = params
 
     ## YOUR CODE HERE:
+    (c, r0, r1, rr) = proof
+    W_prime = rr * g + r0 * h0 + r1 * h1 + c * C
 
-    return ## YOUR RETURN HERE
+    return to_challenge([g, h0, h1, C, W_prime]) == c ## YOUR RETURN HERE
 
 #####################################################
 # TASK 6 -- (OPTIONAL) Prove that a ciphertext is either 0 or 1
