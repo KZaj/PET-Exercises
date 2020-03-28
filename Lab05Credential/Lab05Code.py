@@ -7,7 +7,7 @@
 # $ py.test -v test_file_name.py
 
 ###########################
-# Group Members: TODO
+# Group Members: Kamil Zajac
 ###########################
 
 from petlib.ec import EcGroup
@@ -89,8 +89,19 @@ def credential_EncryptUserSecret(params, pub, priv):
     #  NIZK{(v, k, priv): a = k * g and 
     #                     b = k * pub + v * g and 
     #                     pub = priv * g}
-
+    
     ## TODO
+    _v, _k, _priv = o.random(), o.random(), o.random()
+
+    W_a = _k * g
+    W_b = _k * pub + _v * g
+    W_pub = _priv * g
+
+    c = to_challenge([g, pub, a, b, W_a, W_b, W_pub])
+
+    rk = (_k - c * k) % o
+    rv = (_v - c * v) % o
+    rpriv = (_priv - c * priv) % o
 
     # Return the fresh v, the encryption of v and the proof.
     proof = (c, rk, rv, rpriv)
@@ -143,11 +154,24 @@ def credential_Issuing(params, pub, ciphertext, issuer_params):
     #     and x1b = (b * x1) mod o 
     
     # TODO 1 & 2
+    beta = o.random()
+    u = beta * g
+    X1b = beta * X1
+    x1b = (beta * x1) % o
 
     # 3) The encrypted MAC is u, and an encrypted u_prime defined as 
     #    E( (b*x0) * g + (x1 * b * v) * g ) + E(0; r_prime)
     
     # TODO 3
+    u_prime_a = x1b * a
+    u_prime_b = x1b * b + x0 * u
+
+    r_prime = o.random()
+    enc_zero = r_prime * g, r_prime * pub
+    zero_a, zero_b = enc_zero
+
+    new_a = u_prime_a + zero_a
+    new_b = u_prime_b + zero_b
 
     ciphertext = new_a, new_b
 
@@ -162,6 +186,27 @@ def credential_Issuing(params, pub, ciphertext, issuer_params):
     #       Cx0 = x0 * g + x0_bar * h }
 
     ## TODO proof
+    ws = [o.random() for _ in range(6)]
+
+    # ws = _x1, _beta, _x1b, _r_prime, _x0, _x0_bar
+    W_X1 = ws[0] * h
+    W_X1b = ws[1] * X1
+    W_X1b_ = ws[2] * h
+    W_u = ws[1] * g
+    W_new_a = ws[3] * g + ws[2] * a
+    W_new_b = ws[3] * pub + ws[2] * b + ws[4] * u
+    W_Cx0 = ws[4] * g + ws[5] * h
+
+    c = to_challenge([g, h, pub, a, b, X1, X1b, new_a, new_b, Cx0, \
+                    W_X1, W_X1b, W_X1b_, W_u, W_new_a, W_new_b, W_Cx0])
+
+    rs = [ (ws[0] - c * x1) % o,
+           (ws[1] - c * beta) % o, 
+           (ws[2] - c * x1b) % o,
+           (ws[3] - c * r_prime) % o,
+           (ws[4] - c * x0) % o, 
+           (ws[5] - c * x0_bar) % o
+         ]
 
     proof = (c, rs, X1b) # Where rs are multiple responses
 
@@ -227,11 +272,21 @@ def credential_show(params, issuer_pub_params, u, u_prime, v):
     #    random alpha.
     
     # TODO 1
+    alpha = o.random()
+    u, u_prime = alpha * u, alpha * u_prime
 
     # 2) Implement the "Show" protocol (p.9) for a single attribute v.
     #    Cv is a commitment to v and Cup is C_{u'} in the paper. 
 
     # TODO 2
+
+    # C_m = u^m * h^z
+    z1 = o.random()
+    Cv = v * u + z1 * h
+
+    # C_{u'} = u' * g^r
+    r = o.random()
+    Cup = u_prime + r * g
 
     tag = (u, Cv, Cup)
 
@@ -242,6 +297,18 @@ def credential_show(params, issuer_pub_params, u, u_prime, v):
     #           V  = r * (-g) + z1 * X1 }
 
     ## TODO proof
+    _r = o.random()
+    _z1 = o.random()
+    _v = o.random()
+
+    W_Cv = _v * u + _z1 * h
+    W_V = _r * (-g) + _z1 * X1
+    
+    c = to_challenge([g, h, u, X1, Cv, Cup, W_Cv, W_V])
+
+    rr = (_r - c * r) % o 
+    rz1 = (_z1 - c * z1) % o
+    rv = (_v - c * v) % o
 
     proof = (c, rr, rz1, rv)
     return tag, proof
@@ -261,6 +328,11 @@ def credential_show_verify(params, issuer_params, tag, proof):
     (u, Cv, Cup) = tag
 
     ## TODO
+    v = x0 * u + x1 * Cv - Cup
+    W_Cv = c * Cv + rv * u + rz1 * h
+    W_V = c * v + rr * (-g) + rz1 * X1 
+
+    c_prime = to_challenge([g, h, u, X1, Cv, Cup, W_Cv, W_V])
 
     return c == c_prime
 
@@ -285,7 +357,31 @@ def credential_show_pseudonym(params, issuer_pub_params, u, u_prime, v, service_
     pseudonym = v * N
 
     ## TODO (use code from above and modify as necessary!)
+    alpha = o.random()
+    u, u_prime = alpha * u, alpha * u_prime
 
+    z1 = o.random()
+    Cv = v * u + z1 * h
+    r = o.random()
+    Cup = u_prime + r * g
+
+    tag = (u, Cv, Cup)
+
+    _r = o.random()
+    _z1 = o.random()
+    _v = o.random()
+
+    W_Cv = _v * u + _z1 * h
+    W_V = _r * (-g) + _z1 * X1
+    W_pseudo = _v * N
+    
+    c = to_challenge([g, h, u, X1, Cv, Cup, W_Cv, W_V, W_pseudo])
+
+    rr = (_r - c * r) % o 
+    rz1 = (_z1 - c * z1) % o
+    rv = (_v - c * v) % o
+
+    proof = (c, rr, rz1, rv)
     return pseudonym, tag, proof
 
 def credential_show_verify_pseudonym(params, issuer_params, pseudonym, tag, proof, service_name):
@@ -305,6 +401,15 @@ def credential_show_verify_pseudonym(params, issuer_params, pseudonym, tag, proo
     ## Verify the correct Show protocol and the correctness of the pseudonym
 
     # TODO (use code from above and modify as necessary!)
+    (c, rr, rz1, rv) = proof
+    (u, Cv, Cup) = tag
+
+    v = x0 * u + x1 * Cv - Cup
+    W_Cv = c * Cv + rv * u + rz1 * h
+    W_V = c * v + rr * (-g) + rz1 * X1
+    W_pseudo = c * pseudonym + rv * N
+
+    c_prime = to_challenge([g, h, u, X1, Cv, Cup, W_Cv, W_V, W_pseudo])
 
     return c == c_prime
 
